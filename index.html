@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor de Nivel de Agua</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+
+let alertaBajaMostrada = false; // Estado para la primera alerta
+let alertaRecuperacionMostrada = false; // Estado para la alerta de recuperación
+let alertaLimiteMostrada = false; // Estado para la alerta de límite superior
+
+function actualizarGrafica(chart) {
+    fetch('/distancia')
+        .then(response => response.json())
+        .then(data => {
+            const distancia = data.distancia.toFixed(2);
+            chart.data.datasets[0].data = [distancia];
+           
+            // Cambiar el color de la barra según el valor de la distancia
+            let color;
+            if (distancia >= 75) {
+                color = 'rgba(54, 162, 235, 0.2)'; // Azul
+            } else if (distancia >= 25) {
+                color = 'rgba(255, 206, 86, 0.2)'; // Amarillo
+            } else {
+                color = 'rgba(255, 99, 132, 0.2)'; // Rojo
+            }
+            chart.data.datasets[0].backgroundColor = color;
+            chart.data.datasets[0].borderColor = color;
+           
+            chart.update();
+           
+            // Actualiza el contenido del span con el valor de la distancia
+            document.getElementById('distanciaValue').innerText = `Nivel del agua ${distancia} cm`;
+
+            // Mostrar mensaje de estado en el span correspondiente
+            let mensajeEstado;
+            if (distancia >= 75) {
+                mensajeEstado = "El recipiente tiene un buen suministro.";
+            } else if (distancia >= 25) {
+                mensajeEstado = "El nivel del agua está bajando.";
+            } else if (distancia <= 24) {
+                mensajeEstado = "El recipiente necesita ser llenado.";
+            }
+            document.getElementById('estado').innerText = mensajeEstado;
+
+            // Mostrar alerta de advertencia si la distancia es menor a 24 cm
+            if (distancia < 24) {
+                if (!alertaBajaMostrada) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: '¡Alerta!',
+                        text: 'El agua del recipiente está por acabarse. Asegúrate de llenarlo de nuevo.',
+                        showConfirmButton: false,
+                        timer: 5000 // La alerta desaparecerá después de 2 segundos
+                    });
+                    alertaBajaMostrada = true; // Marca que la alerta de baja ha sido mostrada
+                }
+                alertaRecuperacionMostrada = false; // Asegura que la alerta de recuperación no se muestra mientras la distancia está baja
+            } else {
+                // Mostrar alerta de recuperación si la distancia es mayor o igual a 24 cm
+                // y la alerta de recuperación aún no se ha mostrado
+                if (!alertaRecuperacionMostrada && alertaBajaMostrada) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: '¡Recuperación!',
+                        text: 'El tanque está llenándose.',
+                        showConfirmButton: false,
+                        timer: 5000 // La alerta desaparecerá después de 2 segundos
+                    });
+                    alertaRecuperacionMostrada = true; // Marca que la alerta de recuperación ha sido mostrada
+                }
+                // Restablecer la alerta de baja cuando la distancia vuelve a subir
+                alertaBajaMostrada = false;
+            }
+           
+            // Mostrar alerta de límite superior si la distancia es mayor a 90 cm
+            if (distancia > 90) {
+                if (!alertaLimiteMostrada) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: '¡Cuidado!',
+                        text: 'El agua del recipiente está a punto de llegar a su punto límite.',
+                        showConfirmButton: false,
+                        timer: 5000 // La alerta desaparecerá después de 2 segundos
+                    });
+                    alertaLimiteMostrada = true; // Marca que la alerta de límite superior ha sido mostrada
+                }
+            } else {
+                // Restablecer el estado de la alerta de límite superior si la distancia es 90 o menos
+                alertaLimiteMostrada = false;
+            }
+        });
+}
+
+        
+
+        window.onload = function() {
+            const ctx = document.getElementById('distanciaChart').getContext('2d');
+            const distanciaChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Distancia'],
+                    datasets: [{
+                        label: 'Agua',
+                        data: [],
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            min: 0,
+                            max: 100,  // Fija el máximo a 100 cm
+                            ticks: {
+                                stepSize: 5,  // Intervalos en la escala Y
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Actualiza la gráfica cada segundo
+            setInterval(function() {
+                actualizarGrafica(distanciaChart);
+            }, 4000);
+        };
+    </script>
+</head>
+<body>
+    <!-- Contenedor de Bootstrap -->
+    <div class="container d-flex justify-content-center align-items-center" style="height: 100vh;">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="text-center mb-4">Monitor de Nivel de Agua</h1>
+                <canvas id="distanciaChart" width="400" height="500"></canvas>
+                <div class="text-center mt-3">
+                    <span id="distanciaValue">Nivel del agua: 0.00 cm</span>
+                    <div id="estado" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS y dependencias (opcional) -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+</body>
+</html>
