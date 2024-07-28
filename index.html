@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor de Nivel de Agua</title>
+    <title>Monitoreo del Nivel del Agua</title>
     <!-- Bootstrap CSS -->
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
-
-let alertaBajaMostrada = false; // Estado para la primera alerta
-let alertaRecuperacionMostrada = false; // Estado para la alerta de recuperación
-let alertaLimiteMostrada = false; // Estado para la alerta de límite superior
+let alertaBajaMostrada = false; 
+let alertaRecuperacionMostrada = false; 
+let alertaLimiteMostrada = false; 
 
 function actualizarGrafica(chart) {
     fetch('/distancia')
@@ -20,14 +20,14 @@ function actualizarGrafica(chart) {
             const distancia = data.distancia.toFixed(2);
             chart.data.datasets[0].data = [distancia];
            
-            // Cambiar el color de la barra según el valor de la distancia
+            
             let color;
             if (distancia >= 75) {
-                color = 'rgba(54, 162, 235, 0.2)'; // Azul
+                color = 'rgba(54, 162, 235, 0.2)'; 
             } else if (distancia >= 25) {
-                color = 'rgba(255, 206, 86, 0.2)'; // Amarillo
+                color = 'rgba(255, 206, 86, 0.2)'; 
             } else {
-                color = 'rgba(255, 99, 132, 0.2)'; // Rojo
+                color = 'rgba(255, 99, 132, 0.2)'; 
             }
             chart.data.datasets[0].backgroundColor = color;
             chart.data.datasets[0].borderColor = color;
@@ -42,23 +42,47 @@ function actualizarGrafica(chart) {
             if (distancia >= 75) {
                 mensajeEstado = "El recipiente tiene un buen suministro.";
             } else if (distancia >= 25) {
-                mensajeEstado = "El nivel del agua está bajando.";
+                mensajeEstado = "No hay de qué preocuparse.";
             } else if (distancia <= 24) {
                 mensajeEstado = "El recipiente necesita ser llenado.";
             }
             document.getElementById('estado').innerText = mensajeEstado;
 
             // Mostrar alerta de advertencia si la distancia es menor a 24 cm
-            if (distancia < 24) {
+            if (distancia <= 24) {
                 if (!alertaBajaMostrada) {
                     Swal.fire({
                         icon: 'warning',
                         title: '¡Alerta!',
                         text: 'El agua del recipiente está por acabarse. Asegúrate de llenarlo de nuevo.',
                         showConfirmButton: false,
-                        timer: 5000 // La alerta desaparecerá después de 2 segundos
+                        timer: 5000 // La alerta desaparecerá después de 5 segundos
                     });
                     alertaBajaMostrada = true; // Marca que la alerta de baja ha sido mostrada
+
+                    // Enviar correo electrónico
+                    const fechaHoraActual = new Date().toLocaleString();
+                    fetch('/send-email', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ fechaHoraActual: fechaHoraActual }),
+                    }).then(response => {
+                        if (!response.ok) {
+                            throw new Error('Error al enviar el correo');
+                        }
+                        return response.json();
+                    }).then(data => {
+                        if (data.success) {
+                            console.log('Correo enviado exitosamente');
+                        } else {
+                            console.error('Error al enviar el correo:', data.error);
+                        }
+                    }).catch(error => {
+                        console.error('Error al enviar el correo:', error);
+                    });
+
                 }
                 alertaRecuperacionMostrada = false; // Asegura que la alerta de recuperación no se muestra mientras la distancia está baja
             } else {
@@ -70,7 +94,7 @@ function actualizarGrafica(chart) {
                         title: '¡Recuperación!',
                         text: 'El tanque está llenándose.',
                         showConfirmButton: false,
-                        timer: 5000 // La alerta desaparecerá después de 2 segundos
+                        timer: 5000 // La alerta desaparecerá después de 5 segundos
                     });
                     alertaRecuperacionMostrada = true; // Marca que la alerta de recuperación ha sido mostrada
                 }
@@ -86,7 +110,7 @@ function actualizarGrafica(chart) {
                         title: '¡Cuidado!',
                         text: 'El agua del recipiente está a punto de llegar a su punto límite.',
                         showConfirmButton: false,
-                        timer: 5000 // La alerta desaparecerá después de 2 segundos
+                        timer: 5000 // La alerta desaparecerá después de 5 segundos
                     });
                     alertaLimiteMostrada = true; // Marca que la alerta de límite superior ha sido mostrada
                 }
@@ -97,41 +121,39 @@ function actualizarGrafica(chart) {
         });
 }
 
-        
-
-        window.onload = function() {
-            const ctx = document.getElementById('distanciaChart').getContext('2d');
-            const distanciaChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: ['Distancia'],
-                    datasets: [{
-                        label: 'Agua',
-                        data: [],
-                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            min: 0,
-                            max: 100,  // Fija el máximo a 100 cm
-                            ticks: {
-                                stepSize: 5,  // Intervalos en la escala Y
-                            }
-                        }
+window.onload = function() {
+    const ctx = document.getElementById('distanciaChart').getContext('2d');
+    const distanciaChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Distancia'],
+            datasets: [{
+                label: 'Agua',
+                data: [],
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    min: 0,
+                    max: 100,  // Fija el máximo a 100 cm
+                    ticks: {
+                        stepSize: 5,  // Intervalos en la escala Y
                     }
                 }
-            });
+            }
+        }
+    });
 
-            // Actualiza la gráfica cada segundo
-            setInterval(function() {
-                actualizarGrafica(distanciaChart);
-            }, 4000);
-        };
+    // Actualiza la gráfica cada 4 segundos
+    setInterval(function() {
+        actualizarGrafica(distanciaChart);
+    }, 4000);
+};
     </script>
 </head>
 <body>
@@ -153,7 +175,5 @@ function actualizarGrafica(chart) {
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
 </body>
 </html>
